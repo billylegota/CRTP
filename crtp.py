@@ -7,7 +7,6 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 
-from itertools import chain
 from lrtp import LRTP
 from typing import Union
 
@@ -76,7 +75,7 @@ class CRTP:
             min_span = None
             min_tower = None
             min_remaining = None
-            for tower in chain(np.mod(self.houses + self.radius, 1), np.mod(self.houses - self.radius, 1)):
+            for tower in np.append(np.mod(self.houses + self.radius, 1), np.mod(self.houses - self.radius, 1)):
                 remaining = self.houses[d(self.houses, tower) > self.radius]
                 span = np.ptp(np.mod(remaining - tower, 1))     # This only works when all gaps are less than 2r.
                 if min_span is None or span < min_span:
@@ -98,13 +97,8 @@ class CRTP:
             ax.scatter([2 * np.pi * min_tower], [1], marker='x', c='blue', label='Optimal Tower')
 
             # Find the number of towers and placement of those towers needed to cover the remaining ones.
-            left = LRTP(self.radius, np.sort(np.mod(min_remaining - min_tower, 1)))
-            right = LRTP(self.radius, np.sort(np.mod(min_tower - min_remaining, 1)))
-            if len(left.solution) <= len(right.solution):
-                proposed = np.sort(np.append(np.mod(left.solution + min_tower, 1), min_tower))
-            else:
-                print('Something strange has occurred.')
-                proposed = np.sort(np.append(np.mod(min_tower - right.solution, 1), min_tower))
+            linear = LRTP(self.radius, np.sort(np.mod(min_remaining - min_tower, 1)))
+            proposed = np.sort(np.append(np.mod(linear.solution + min_tower, 1), min_tower))
 
             # Plot the proposed solution.
             for tower in proposed:
@@ -160,7 +154,7 @@ def main():
 
     # Keep running until we find a counterexample (or at least supposed counterexample).
     while True:
-        problem = CRTP.create(0.1, 30)
+        problem = CRTP.create(0.1, 7)
         if not problem.plot():
             print(problem.radius)
             print(problem.houses)
