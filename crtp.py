@@ -137,7 +137,7 @@ class CRTP:
             if check_gaps:
                 if np.any(np.diff(houses) >= 2 * radius):
                     continue
-                if d(houses[-1], houses[0]) >= 2 * radius:
+                if np.mod(houses[0] - houses[-1], 1) >= 2 * radius:
                     continue
 
             return CRTP(radius, houses)
