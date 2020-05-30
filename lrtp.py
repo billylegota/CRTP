@@ -11,8 +11,8 @@ import numpy as np
 class LRTP:
     def __init__(self, radius: float, houses: np.ndarray):
         """Create a new instance of the LRTP from a radius and sorted list of houses.
-        :param radius: The radius of each tower (inclusive).
-        :param houses: The positions of each house in order.
+        :param radius: the radius of each tower.
+        :param houses: the positions of each house in order.
         """
         self.radius = radius
         self.houses = houses

@@ -19,7 +19,6 @@ def d(x: Union[np.ndarray, float], y: Union[np.ndarray, float], modulus=1) -> Un
     :param modulus: The modulus of the distance metric. Defaults to 1.
     :return: The unsigned modular distance between x and y.
     """
-    # See: https://stackoverflow.com/questions/6192825/c-calculating-the-distance-between-2-floats-modulo-12
     return np.minimum(
         np.mod(modulus + y - x, modulus),
         np.mod(modulus + x - y, modulus)
@@ -29,21 +28,24 @@ def d(x: Union[np.ndarray, float], y: Union[np.ndarray, float], modulus=1) -> Un
 class CRTP:
     def __init__(self, radius: float, houses: np.ndarray):
         """Create a new instance of the CRTP from a radius and sorted list of houses.
-        :param radius: The radius of each tower (inclusive).
-        :param houses: The positions of each house in order.
+        :param radius: radius of each tower.
+        :param houses: positions of each house in order.
         """
         self.radius = radius
         self.houses = houses
         self._solution = None
 
     @property
-    def solution(self):
+    def solution(self) -> np.ndarray:
+        """Returns an optimal solution to this instance of the CRTP obtained via the O(n^2) algorithm.
+        :return: an optimal solution to this instance of the CRTP.
+        """
         if self._solution is None:
             self._solve()
         return self._solution
 
     def _solve(self):
-        """Solve this instance of the CRTP by O(n) reductions to the LRTP.
+        """Solve this instance of the CRTP by n reductions to the LRTP. Overall runtime O(n^2).
         """
         self._solution = None
         for offset in self.houses:
@@ -68,64 +70,61 @@ class CRTP:
 
             ax.scatter(2 * np.pi * self.solution, np.ones_like(self.solution), marker='x', c='red')
 
+        # TODO: Separate the computation of the proposed solution from the plotting of the solution.
         if debug:
-            # Find the tower location such that the remaining span is minimized.
+            # Find the tower position which has the property that the span of the remaining houses is minimized.
             min_span = None
-            min_candidate = None
+            min_tower = None
             min_remaining = None
-            for candidate in chain(np.mod(self.houses + self.radius, 1), np.mod(self.houses - self.radius, 1)):
-                remaining = self.houses[d(self.houses, candidate) > self.radius]
-                span = np.ptp(np.mod(remaining - candidate, 1))     # FIXME: This calculation is probably wrong.
+            for tower in chain(np.mod(self.houses + self.radius, 1), np.mod(self.houses - self.radius, 1)):
+                remaining = self.houses[d(self.houses, tower) > self.radius]
+                span = np.ptp(np.mod(remaining - tower, 1))     # This only works when all gaps are less than 2r.
                 if min_span is None or span < min_span:
                     min_span = span
-                    min_candidate = candidate
+                    min_tower = tower
                     min_remaining = remaining
 
+            # Plot the span of the remaining towers for the optimal tower choice.
             theta = 2 * np.pi * np.linspace(
-                np.min(np.mod(min_remaining - min_candidate, 1)) + min_candidate,
-                np.max(np.mod(min_remaining - min_candidate, 1)) + min_candidate,
+                np.min(np.mod(min_remaining - min_tower, 1)) + min_tower,
+                np.max(np.mod(min_remaining - min_tower, 1)) + min_tower,
                 100
             )
             ax.fill_between(theta, 0.6, 0.8, alpha=0.5, color='green')
 
-            theta = 2 * np.pi * np.linspace(min_candidate - self.radius, min_candidate + self.radius, 100)
+            # Plot the span of the optimal tower itself. This span along with the other should cover all houses.
+            theta = 2 * np.pi * np.linspace(min_tower - self.radius, min_tower + self.radius, 100)
             ax.fill_between(theta, 0.6, 0.8, alpha=0.5, color='blue')
 
             # Find the number of towers and placement of those towers needed to cover the remaining ones.
-            linear = LRTP(self.radius, min_remaining)
-            proposed = np.sort(np.append(linear.solution, min_candidate))
+            left = LRTP(self.radius, np.sort(np.mod(min_remaining - min_tower, 1)))
+            right = LRTP(self.radius, np.sort(np.mod(min_tower - min_remaining, 1)))
+            if len(left.solution) <= len(right.solution):
+                proposed = np.sort(np.append(np.mod(left.solution + min_tower, 1), min_tower))
+            else:
+                proposed = np.sort(np.append(np.mod(min_tower - right.solution, 1), min_tower))
 
+            # Plot the proposed solution.
             for tower in proposed:
                 theta = 2 * np.pi * np.linspace(tower - self.radius, tower + self.radius, 100)
                 ax.fill_between(theta, 0.8, 1, alpha=0.5, color='pink')
 
-            ax.scatter([2 * np.pi * min_candidate], [1], marker='*', c='black', s=400)
+            ax.scatter([2 * np.pi * min_tower], [1], marker='*', c='black', s=400)
             ax.scatter(2 * np.pi * proposed, np.ones_like(proposed), marker='X', c='pink')
 
-            # # Perform a cut in either direction at the house with the minimum span.
-            # left = LRTP(self.radius, np.sort(np.mod(self.houses - min_candidate, 1)))
-            # right = LRTP(self.radius, np.sort(np.mod(min_candidate - self.houses, 1)))
-            #
-            # # FIXME: This is currently wrong. We are not cutting at the right place. The algorithm proposed says that we
-            # #        should place a tower at the given candidate. This *should* just mean that the final answer is just
-            # #        the number of towers needed to cover the remaining houses.
-            #
-            # if len(left.solution) <= len(right.solution):
-            #     proposed = np.sort(np.mod(left.solution + min_candidate, 1))
-            # else:
-            #     proposed = np.sort(np.mod(min_candidate - right.solution, 1))
-            #
-            # for tower in proposed:
-            #     theta = 2 * np.pi * np.linspace(tower - self.radius, tower + self.radius, 100)
-            #     ax.fill_between(theta, 0.8, 1, alpha=0.5, color='pink')
-            #
-            # ax.scatter([2 * np.pi * min_candidate], [1], marker='*', c='black')
-            # ax.scatter(2 * np.pi * proposed, np.ones_like(proposed), marker='X', c='pink')
-            #
-            # print(len(proposed), len(self.solution), len(proposed) == len(self.solution))
+            # Determine if the proposed solution is optimal or not.
+            # TODO: Add a check to make sure we are actually covering instead of just checking the number of towers.
+            return len(proposed) == len(self.solution)
 
     @staticmethod
     def create(radius, count, check_gaps=True) -> CRTP:
+        """Create an instance of the CRTP with given radius and number of houses. Optionally check for gaps of 2r.
+        :param radius: the radius of each tower. Should be in (0, 0.5).
+        :param count: the number of houses to place.
+        :param check_gaps: reject generated instances with gaps of 2r or larger.
+        :return: an instance of the CRTP with given radius and number of houses.
+        """
+        # TODO: Add checks to make sure it is actually possible to generate the number of houses requested.
         while True:
             houses = np.sort(np.random.random((count,)))
 
@@ -147,9 +146,16 @@ def main():
     #
     # plt.show()
 
-    problem = CRTP.create(0.1, 30)
-    problem.plot()
-    plt.show()
+    # Keep running until we find a counterexample (or at least supposed counterexample).
+    while True:
+        problem = CRTP.create(0.1, 30)
+        if not problem.plot():
+            print(problem.radius)
+            print(problem.houses)
+            plt.show()
+            break
+        else:
+            plt.close()
 
 
 if __name__ == '__main__':
