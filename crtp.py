@@ -61,14 +61,14 @@ class CRTP:
         ax.set_yticklabels([])
 
         if show_houses:
-            ax.scatter(2 * np.pi * self.houses, np.ones_like(self.houses), marker='o', c='blue')
+            ax.scatter(2 * np.pi * self.houses, np.ones_like(self.houses), marker='o', c='blue', label='House')
 
         if show_solution:
             for tower in self.solution:
                 theta = 2 * np.pi * np.linspace(tower - self.radius, tower + self.radius, 100)
-                ax.fill_between(theta, 1, 1.2, alpha=0.5, color='red')
+                ax.fill_between(theta, 1, 1.2, alpha=0.5, color='red', label='Tower Coverage')
 
-            ax.scatter(2 * np.pi * self.solution, np.ones_like(self.solution), marker='x', c='red')
+            ax.scatter(2 * np.pi * self.solution, np.ones_like(self.solution), marker='x', c='red', label='Tower')
 
         # TODO: Separate the computation of the proposed solution from the plotting of the solution.
         if debug:
@@ -90,11 +90,12 @@ class CRTP:
                 np.max(np.mod(min_remaining - min_tower, 1)) + min_tower,
                 100
             )
-            ax.fill_between(theta, 0.6, 0.8, alpha=0.5, color='green')
+            ax.fill_between(theta, 0.6, 0.8, alpha=0.5, color='green', label='Optimal Remaining Span')
 
             # Plot the span of the optimal tower itself. This span along with the other should cover all houses.
             theta = 2 * np.pi * np.linspace(min_tower - self.radius, min_tower + self.radius, 100)
-            ax.fill_between(theta, 0.6, 0.8, alpha=0.5, color='blue')
+            ax.fill_between(theta, 0.6, 0.8, alpha=0.5, color='blue', label='Optimal Tower Coverage')
+            ax.scatter([2 * np.pi * min_tower], [1], marker='x', c='blue', label='Optimal Tower')
 
             # Find the number of towers and placement of those towers needed to cover the remaining ones.
             left = LRTP(self.radius, np.sort(np.mod(min_remaining - min_tower, 1)))
@@ -102,19 +103,30 @@ class CRTP:
             if len(left.solution) <= len(right.solution):
                 proposed = np.sort(np.append(np.mod(left.solution + min_tower, 1), min_tower))
             else:
+                print('Something strange has occurred.')
                 proposed = np.sort(np.append(np.mod(min_tower - right.solution, 1), min_tower))
 
             # Plot the proposed solution.
             for tower in proposed:
                 theta = 2 * np.pi * np.linspace(tower - self.radius, tower + self.radius, 100)
-                ax.fill_between(theta, 0.8, 1, alpha=0.5, color='pink')
+                ax.fill_between(theta, 0.8, 1, alpha=0.5, color='pink', label='Proposed Tower Coverage')
 
-            ax.scatter([2 * np.pi * min_tower], [1], marker='*', c='black', s=400)
-            ax.scatter(2 * np.pi * proposed, np.ones_like(proposed), marker='X', c='pink')
+            ax.scatter(2 * np.pi * proposed, np.ones_like(proposed), marker='x', c='pink', label='Proposed Tower')
+
+            # Add legend.
+            # TODO: Remove this once we get rid of the return below.
+            handles, labels = plt.gca().get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            plt.legend(by_label.values(), by_label.keys(), bbox_to_anchor=(1.04, 1), loc='upper left')
 
             # Determine if the proposed solution is optimal or not.
             # TODO: Add a check to make sure we are actually covering instead of just checking the number of towers.
             return len(proposed) == len(self.solution)
+
+        # Add legend.
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), bbox_to_anchor=(1.04, 1), loc='upper left')
 
     @staticmethod
     def create(radius, count, check_gaps=True) -> CRTP:
